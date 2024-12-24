@@ -1,5 +1,6 @@
 import { App, TFile } from "obsidian";
 import { removeCode } from "./utils";
+import { Debug } from "./utils/debug";
 
 /**
  * Searches the annotated links from the content of the backlinks of the specified file.
@@ -104,12 +105,23 @@ export function getPropertyLinks(
 	}[] = [];
 	const fileCache = app.metadataCache.getFileCache(file);
 
+	Debug.log("getPropertyLinks input", {
+		propertyNames,
+		filePath: file.path,
+		displayPropertyName,
+	});
+
 	if (!fileCache?.frontmatter) {
+		Debug.log("getPropertyLinks", "No frontmatter found");
 		return result;
 	}
 
 	for (const propertyName of propertyNames) {
 		if (!(propertyName in fileCache.frontmatter)) {
+			Debug.log(
+				"getPropertyLinks",
+				`Property ${propertyName} not found in frontmatter`
+			);
 			continue;
 		}
 
@@ -118,17 +130,38 @@ export function getPropertyLinks(
 			? propertyValue
 			: [propertyValue];
 
+		Debug.log("getPropertyLinks property", {
+			propertyName,
+			propertyValue,
+			paths,
+		});
+
 		for (const path of paths) {
 			if (!path || typeof path !== "string") continue;
 
-			// Process wiki link format
-			const { path: actualPath, displayText } = parseWikiLink(path);
+			Debug.log("getPropertyLinks path", {
+				originalPath: path,
+				isWikiLink: path.startsWith("[[") && path.endsWith("]]"),
+			});
+
+			// 处理 wiki 链接格式
+			const actualPath = parseWikiLink(path);
+			Debug.log("getPropertyLinks parsed path", {
+				originalPath: path,
+				actualPath: actualPath,
+			});
 
 			const linkedFile = app.metadataCache.getFirstLinkpathDest(
 				actualPath,
 				file.path
 			);
 			if (!linkedFile) {
+				Debug.log("getPropertyLinks", {
+					error: "File not found",
+					originalPath: path,
+					parsedPath: actualPath,
+					currentFilePath: file.path,
+				});
 				continue;
 			}
 
@@ -136,12 +169,17 @@ export function getPropertyLinks(
 			const linkedFileCache = app.metadataCache.getFileCache(linkedFile);
 			let displayValue: string | string[] | undefined;
 
-			// First, check if there is display text
-			if (displayText) {
-				displayValue = displayText;
-			} else {
-				
-			// Otherwise, check if the display property name is specified
+			Debug.log("getPropertyLinks linked file", {
+				linkedFile: linkedFile.path,
+				frontmatter: linkedFileCache?.frontmatter,
+				displayPropertyName,
+				hasProperty:
+					linkedFileCache?.frontmatter && displayPropertyName
+						? displayPropertyName in
+						  (linkedFileCache.frontmatter || {})
+						: false,
+			});
+
 			// Make sure we get the title from frontmatter
 			if (linkedFileCache?.frontmatter && displayPropertyName) {
 				if (
@@ -150,6 +188,10 @@ export function getPropertyLinks(
 				) {
 					// If title is not in frontmatter, use the file title
 					displayValue = linkedFile.basename;
+					Debug.log(
+						"getPropertyLinks",
+						`Using file basename as title: ${displayValue}`
+					);
 				} else if (displayPropertyName in linkedFileCache.frontmatter) {
 					const value = linkedFileCache.frontmatter[
 						displayPropertyName
@@ -164,8 +206,15 @@ export function getPropertyLinks(
 					} else {
 						displayValue = "";
 					}
+					Debug.log(
+						"getPropertyLinks",
+						`Found display value in frontmatter: ${
+							typeof displayValue === "string"
+								? displayValue
+								: displayValue.join(", ")
+						}`
+					);
 				}
-			}
 			}
 
 			result.push({
@@ -176,24 +225,17 @@ export function getPropertyLinks(
 		}
 	}
 
+	Debug.log("getPropertyLinks result", result);
 	return result;
 }
 
-interface WikiLinkParts {
-  path: string;
-  displayText?: string;
-}
-
-// Parse wiki link format to get the actual file name
-function parseWikiLink(path: string): WikiLinkParts {
-// Match [[Filename|DisplayText]] or [[Filename]] format
-
-  const wikiLinkRegex = /^\[\[([^|\]]+)(?:\|([^\]]+))?\]\]$/;
-  const match = path.match(wikiLinkRegex);
-  if (match) {
-    return {
-      path: match[1],
-      displayText: match[2] 
-  }
-  return { path };
+// 解析 wiki 链接格式，返回实际路径
+function parseWikiLink(path: string): string {
+	// 匹配 [[文件名|显示名]] 或 [[文件名]] 格式
+	const wikiLinkRegex = /^\[\[([^|\]]+)(?:\|[^\]]+)?\]\]$/;
+	const match = path.match(wikiLinkRegex);
+	if (match) {
+		return match[1]; // 返回实际文件名部分
+	}
+	return path;
 }

@@ -18,6 +18,7 @@ export interface NavLinkHeaderSettings {
 	filterDuplicateNotes: boolean;
 	usePropertyAsDisplayName: boolean;
 	displayPropertyName: string;
+	devMode: boolean;
 }
 
 export const DEFAULT_SETTINGS: NavLinkHeaderSettings = {
@@ -37,6 +38,7 @@ export const DEFAULT_SETTINGS: NavLinkHeaderSettings = {
 	filterDuplicateNotes: true,
 	usePropertyAsDisplayName: false,
 	displayPropertyName: "title",
+	devMode: false,
 };
 
 export class NavLinkHeaderSettingTab extends PluginSettingTab {
@@ -256,22 +258,6 @@ export class NavLinkHeaderSettingTab extends PluginSettingTab {
 						(mapping) => `${mapping.property}:${mapping.emoji}`
 					)
 					.join("\n");
-				
-				const settingItem = text.inputEl.parentElement?.parentElement;
-				if (settingItem) {
-					settingItem.style.alignItems = "flex-start";
-					settingItem.style.display = "flex";
-				}
-				
-				const inputContainer = text.inputEl.parentElement;
-				if (inputContainer) {
-					inputContainer.style.width = "75%";
-				}
-				
-				text.inputEl.style.minHeight = "80px";
-				text.inputEl.style.width = "100%";
-				text.inputEl.style.resize = "vertical";
-				
 				text.setValue(mappings)
 					.setPlaceholder("up:⬆️\nparent:👆\nsource:📚")
 					.onChange(async (value) => {
@@ -291,7 +277,7 @@ export class NavLinkHeaderSettingTab extends PluginSettingTab {
 							"nav-link-header:settings-changed"
 						);
 						await this.plugin.saveSettings();
-						});
+					});
 			});
 
 		new Setting(containerEl)
@@ -347,5 +333,17 @@ export class NavLinkHeaderSettingTab extends PluginSettingTab {
 					});
 				});
 		}
+
+		new Setting(containerEl)
+			.setName("Development mode")
+			.setDesc("Enable development mode for debugging purposes.")
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings!.devMode)
+					.onChange(async (value) => {
+						this.plugin.settings!.devMode = value;
+						await this.plugin.saveSettings();
+					});
+			});
 	}
 }
